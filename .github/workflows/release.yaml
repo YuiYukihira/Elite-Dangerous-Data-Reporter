@@ -1,0 +1,238 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: write
+  pull-requests: write
+  repository-projects: write
+  id-token: write
+  attestations: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version_full: ${{ steps.version.outputs.full }}
+    steps:
+      - name: Check tag version
+        uses: nowsprinting/check-version-format-action@v3
+        id: version
+        with:
+          prefix: "v"
+      - name: Version tag only step
+        run: |
+          echo "Found valid version format in tag!"
+          echo "Full version: ${{ steps.version.outputs.full }}"
+          echo "Major version: ${{ steps.version.outputs.major }}"
+          echo "Major with pre-release: ${{ steps.version.outputs.major_prerelease }}"
+        if: steps.version.outputs.is_valid == 'true'
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Check VERSION file integrity
+        id: check_version_file
+        run: |
+          echo "Checking if VERSION file matches tag version..."
+          if [ "$(cat src/eddr/VERSION)" != "${{ steps.version.outputs.full }}" ]; then
+            echo "VERSION file does not match tag version!"
+            exit 1
+          fi
+          echo "VERSION file matches tag version!"
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: ${{ steps.version.outputs.is_stable == 'false' }}
+
+  build-linux:
+    uses: ./.github/workflows/generate_exe.yaml
+    with:
+      runs-on: ubuntu-latest
+      specfile: build.spec
+      artifact-name: EDDR-linux
+
+  release-linux:
+    runs-on: ubuntu-latest
+    needs:
+      - create-release
+      - build-linux
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build-linux.outputs.artifact-id }}
+          path: EDDR
+      - name: Compress Directory
+        run: |
+          tar -czf EDDR.tar.gz -C EDDR .
+          ls -lh EDDR.tar.gz
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: EDDR.tar.gz
+          asset_name: EDDR-Linux-${{ needs.create-release.outputs.version_full }}.tar.gz
+          asset_content_type: application/gzip
+      - name: Compute semver
+        id: semver
+        run: |
+          VER='${{ needs.create-release.outputs.version_full }}'
+          echo "SEMVER_NO_V=${VER#v}" >> $GITHUB_ENV
+      - name: Build .deb
+        run: |
+          set -euxo pipefail
+          VER_WITH_V='${{ needs.create-release.outputs.version_full }}'
+          SEMVER_NO_V="$SEMVER_NO_V"
+          PYI="EDDR/Elite Dangerous Data Reporter"
+
+          # Stags files into a package root
+          PKGROOT=pkgroot
+          rm -rf "$PKGROOT"
+          mkdir -p "$PKGROOT/opt/eddr" "$PKGROOT/usr/bin" \
+                   "$PKGROOT/usr/share/applications"
+
+          # App payload
+          cp -r "$PYI/." "$PKGROOT/opt/eddr/"
+
+          # Wrapper so users can jusr run `eddr`
+          cat > "$PKGROOT/usr/bin/eddr" <<'EOF'
+          #!/bin/sh
+          exec /opt/eddr/Elite\ Dangerous\ Data\ Reporter "$@"
+          EOF
+          chmod +x "$PKGROOT/usr/bin/eddr"
+
+          # Desktop entry
+          cat > "$PKGROOT/usr/share/applications/eddr.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Elite Dangerous Data Reporter
+          Exec=eddr
+          Categories=Game;Utility;
+          Terminal=False
+          EOF
+
+          # Install fpm and build the .deb
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential rpm
+          sudo gem install --no-document fpm
+
+          fpm -s dir -t deb -n eddr -v "$SEMVER_NO_V" -C "$PKGROOT" \
+            --architecture amd64 \
+            --deb-compression xz \
+            --license "GPL-3.0-only" \
+            --maintainer "Lucy Ekaterina lucy@dragnof.pro" \
+            --description "Elite Dangerous Data Reporter" \
+            --url "https://github.com/${{ github.repository }}" \
+            -p "EDDR-${VER_WITH_V}_amd64.deb"
+          ls -l "EDDR-${VER_WITH_V}_amd64.deb"
+      - name: Generate artifact attestation
+        id: attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            EDDR-${{ needs.create-release.outputs.version_full }}_amd64.deb
+            EDDR.tar.gz
+      - name: Upload AppImage
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: EDDR-${{ needs.create-release.outputs.version_full }}_amd64.deb
+          asset_name: EDDR-${{ needs.create-release.outputs.version_full }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+      - name: Upload Linux Attestation as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: attestation-linux
+          path: ${{ steps.attestation.outputs.bundle-path }}
+
+  build-windows:
+    uses: ./.github/workflows/generate_exe.yaml
+    with:
+      runs-on: windows-latest
+      specfile: build.spec
+      artifact-name: EDDR
+
+  release-windows:
+    runs-on: windows-latest
+    needs:
+      - build-windows
+      - create-release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build-windows.outputs.artifact-id }}
+          path: EDDR
+      - name: Build Windows Installer (Inno Setup)
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.7
+        with:
+          path: \installer\setup.iss
+          options: /O+
+        env:
+          APP_VERSION: ${{ needs.create-release.outputs.version_full }}
+          INPUT_DIR: "${{ github.workspace }}\\eddr\\Elite Dangerous Data Reporter"
+          OUTPUT_DIR: "${{ github.workspace }}\\installer\\dist"
+      - name: Generate artifact attestation
+        id: attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ github.workspace }}\installer\dist\EDDR-Setup-${{ needs.create-release.outputs.version_full }}.exe
+
+      - name: Upload Windows Installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}\installer\dist\EDDR-Setup-${{ needs.create-release.outputs.version_full }}.exe
+          asset_name: EDDR-Setup-${{ needs.create-release.outputs.version_full }}.exe
+          asset_content_type: application/vnd.microsoft.portable-executable
+
+      - name: Upload Windows Attestation as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: attestation-windows
+          path: ${{ steps.attestation.outputs.bundle-path }}
+
+  combine-attestations:
+    runs-on: ubuntu-latest
+    needs: [create-release, release-linux, release-windows]
+    steps:
+      - name: Download Linux Executable Attestation
+        uses: actions/download-artifact@v4
+        with:
+          name: attestation-linux
+          path: ./attestations/linux
+
+      - name: Download Windows Executable Attestation
+        uses: actions/download-artifact@v4
+        with:
+          name: attestation-windows
+          path: ./attestations/windows
+
+      - name: Combine Attestations
+        run: |
+          jq -s '.[0] * .[1]' ./attestations/linux/attestation.json ./attestations/windows/attestation.json > combined-attestation.json
+
+      - name: Upload Combined Attestation
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./combined-attestation.json
+          asset_name: attestation.json
+          asset_content_type: application/json

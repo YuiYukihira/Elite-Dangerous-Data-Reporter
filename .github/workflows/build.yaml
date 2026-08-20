@@ -1,0 +1,24 @@
+name: Build
+permissions:
+  contents: read
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    uses: ./.github/workflows/generate_exe.yaml
+    with:
+      runs-on: windows-latest
+      specfile: build.spec
+      artifact-name: EDDR
+  build-linux:
+    uses: ./.github/workflows/generate_exe.yaml
+    with:
+      runs-on: ubuntu-latest
+      specfile: build.spec
+      artifact-name: EDDR-linux

@@ -1,0 +1,27 @@
+[project]
+name = "eddr"
+version = "0.1.0"
+description = "Elite Dangerous Data Reporter"
+readme = "README.md"
+authors = [
+    { name = "Lucy Ekaterina", email = "lucy@dragnof.pro" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "humanize>=4.16.0",
+    "requests>=2.34.2",
+    "sv-ttk>=2.6.1",
+    "watchdog>=6.0.0",
+]
+
+[project.scripts]
+eddr = "eddr:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.22.2",
+]

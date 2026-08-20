@@ -1,0 +1,45 @@
+name: Generate Exe
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "OS to build for"
+        default: "ubuntu-latest"
+        required: false
+        type: string
+      specfile:
+        description: "Specfile to build"
+        required: true
+        type: string
+      artifact-name:
+        description: "Resulting name of the artifact"
+        required: false
+        type: string
+    outputs:
+      artifact-id:
+        description: "Id of the resulting artifact"
+        value: ${{ jobs.build.outputs.artifact-id }}
+jobs:
+  build:
+    runs-on: ${{ inputs.runs-on }}
+    outputs:
+      artifact-id: ${{ steps.upload_artifact.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+      - name: "Setup up Python"
+        uses: actions/setup-python@9191ea1a55b1e7028943ee5647bf579e1182b42d
+        with:
+          python-version-file: ".python-version"
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@5ec49509d70659645262a4de30e9f261902d34a7
+      - name: "Get deps"
+        run: uv sync --locked --all-extras --dev
+      - name: "Build"
+        run: uv run pyinstaller ${{ inputs.specfile }}
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        id: upload_artifact
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist/**/*
