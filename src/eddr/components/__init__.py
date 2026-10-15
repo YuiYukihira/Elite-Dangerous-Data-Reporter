@@ -1,4 +1,3 @@
-import threading
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import StringVar, ttk
@@ -29,7 +28,7 @@ class SuggestionBox(ttk.Combobox):
         self.on_debounced_keypress = cast(
             Callable[..., bool] | None, kwargs.get("on_debounced_keypressed", None)
         )
-        self.timer: threading.Timer | None = None
+        self.timer: str | None = None
         self.textvariable.trace_add("write", lambda *_: self._var_written())
 
     def configure(self, *args, **kwargs):
@@ -49,11 +48,11 @@ class SuggestionBox(ttk.Combobox):
 
     def _var_written(self):
         if self.timer is not None:
-            self.timer.cancel()
-        self.timer = threading.Timer(0.5, self._on_debounced_keypress)
-        self.timer.start()
+            self.after_cancel(self.timer)
+        self.timer = self.after(500, self._on_debounced_keypress)
 
     def _on_debounced_keypress(self):
+        self.timer = None
         if self.on_debounced_keypress is not None and self.on_debounced_keypress():
             self.event_generate("<Down>")
             # self.listbox.focus_set()

@@ -40,6 +40,8 @@ class RouteController:
             "write", lambda *args: self.on_cmdr_selected()
         )
 
+        self.suggestion_counter = 0
+
         self._fsd_info = {}
         with open(get_resource_path(os.path.join("data", "fsds.json"))) as f:
             data = json.load(f)
@@ -259,22 +261,25 @@ class RouteController:
                 destination=destination,
             )
 
-            self.view.progress.pack_forget()
-            self.view.destination_input.configure(state="normal")
-            self.view.button.configure(state="normal")
-            self.view.results.pack(side="top", fill="x", expand=False)
-            self.view.jump_counter.configure(text=f"0/{len(route) - 1}")
-            self.view.next_system.configure(text=f"{route[1]['name']}")
+            def update_ui():
+                self.view.progress.pack_forget()
+                self.view.destination_input.configure(state="normal")
+                self.view.button.configure(state="normal")
+                self.view.results.pack(side="top", fill="x", expand=False)
+                self.view.jump_counter.configure(text=f"0/{len(route) - 1}")
+                self.view.next_system.configure(text=f"{route[1]['name']}")
 
-            if route[0]["must_refuel"]:
-                self.view.refuel.pack(
-                    side="top", fill="x", expand=False, padx=5, pady=5
-                )
+                if route[0]["must_refuel"]:
+                    self.view.refuel.pack(
+                        side="top", fill="x", expand=False, padx=5, pady=5
+                    )
 
-            if route[0]["has_neutron"]:
-                self.view.neutron.pack(
-                    side="top", fill="x", expand=False, padx=5, pady=5
-                )
+                if route[0]["has_neutron"]:
+                    self.view.neutron.pack(
+                        side="top", fill="x", expand=False, padx=5, pady=5
+                    )
+
+            self.parent.view.add_callback(update_ui)
 
         threading.Thread(target=self._run_route, args=(route,), daemon=True).start()
 
@@ -284,9 +289,13 @@ class RouteController:
         except Exception:
             traceback.print_exc()
         finally:
-            self.view.progress.pack_forget()
-            self.view.destination_input.configure(state="normal")
-            self.view.button.configure(state="normal")
+
+            def update_ui():
+                self.view.progress.pack_forget()
+                self.view.destination_input.configure(state="normal")
+                self.view.button.configure(state="normal")
+
+            self.view.parent.add_callback(update_ui)
 
     def _get_destination_suggestions(self) -> bool:
         search_phrase = self.model.destination.get()
@@ -307,30 +316,43 @@ class RouteController:
             "page": 0,
         }
 
-        res = requests.post(
-            "https://www.spansh.co.uk/api/systems/search/save",
-            data=json.dumps(search_string),
-            timeout=30,
-        )
-        if res.status_code != 200:
-            raise Exception(f"Spansh didn't like that: {res.text}")
+        def fetch():
+            counter = self.suggestion_counter
+            res = requests.post(
+                "https://www.spansh.co.uk/api/systems/search/save",
+                timeout=30,
+                data=json.dumps(search_string),
+            )
+            if res.status_code != 200:
+                raise Exception(f"Spansh didn't like that: {res.text}")
 
-        res = res.json()
-        ref_string = res["search_reference"]
+            res = res.json()
+            ref_string = res["search_reference"]
 
-        res = requests.get(
-            f"https://www.spansh.co.uk/api/systems/search/recall/{ref_string}",
-            timeout=30,
-        )
+            res = requests.get(
+                f"https://www.spansh.co.uk/api/systems/search/recall/{ref_string}",
+                timeout=30,
+            )
 
-        if res.status_code != 200:
-            raise Exception(f"Spansh didn't like that: {res.text}")
+            if res.status_code != 200:
+                raise Exception(f"Spansh didn't like that: {res.text}")
 
-        res = res.json()["results"]
-        self.model.destination_suggestions = {
-            entry["name"].lower(): entry["id64"] for entry in res
-        }
-        names = [entry["name"] for entry in res]
+            res = res.json()["results"]
 
-        self.view.destination_input.configure(values=names)
-        return True
+            def update_ui():
+                if counter < self.suggestion_counter:
+                    return
+
+                self.suggestion_counter += 1
+                self.model.destination_suggestions = {
+                    entry["name"].lower(): entry["id64"] for entry in res
+                }
+                self.view.destination_input.configure(
+                    values=[entry["name"] for entry in res]
+                )
+                self.view.destination_input.event_generate("<Down>")
+
+            self.parent.view.add_callback(update_ui)
+
+        threading.Thread(target=fetch, daemon=True).start()
+        return False

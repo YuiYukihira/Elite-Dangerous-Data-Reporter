@@ -114,39 +114,43 @@ class FindController:
                     db.add(carrier)
                     db.commit()
 
-            self.model.results_type = "FleetCarrier" if carrier_name else "Station"
-            self.model.results_system.set(closest["system_name"])
-            self.model.results_location.set(
-                f"{carrier_name} ({closest['name']})"
-                if carrier_name
-                else closest["name"]
-            )
-            self.model.results_location_ref = (
-                closest["name"]
-                if carrier_name
-                else f"{closest['name']} [{closest['system_name']}]"
-            )
+            def update_ui():
+                self.model.results_type = "FleetCarrier" if carrier_name else "Station"
+                self.model.results_system.set(closest["system_name"])
+                self.model.results_location.set(
+                    f"{carrier_name} ({closest['name']})"
+                    if carrier_name
+                    else closest["name"]
+                )
+                self.model.results_location_ref = (
+                    closest["name"]
+                    if carrier_name
+                    else f"{closest['name']} [{closest['system_name']}]"
+                )
 
-            self.view.find_progress.pack_forget()
-            self.view.system_frame.pack(
-                after=self.view.find_button,
-                side="top",
-                fill="x",
-                expand=False,
-                padx=5,
-                pady=5,
-            )
-            self.view.location_frame.pack(
-                after=self.view.system_frame,
-                side="top",
-                fill="x",
-                expand=False,
-                padx=5,
-                pady=5,
-            )
-            self.view._lookup_type_combobox.configure(state="normal")
-            self.view.find_button.configure(state="normal")
+                self.view.find_progress.pack_forget()
+                self.view.system_frame.pack(
+                    after=self.view.find_button,
+                    side="top",
+                    fill="x",
+                    expand=False,
+                    padx=5,
+                    pady=5,
+                )
+                self.view.location_frame.pack(
+                    after=self.view.system_frame,
+                    side="top",
+                    fill="x",
+                    expand=False,
+                    padx=5,
+                    pady=5,
+                )
+                self.view._lookup_type_combobox.configure(state="normal")
+                self.view.find_button.configure(state="normal")
+
             self.model.last_search_params = search_string
+
+            self.parent.view.add_callback(update_ui)
 
         threading.Thread(target=self._run_query, args=(_do_query,), daemon=True).start()
 
@@ -156,9 +160,13 @@ class FindController:
         except Exception:
             traceback.print_exc()
         finally:
-            self.view.find_progress.pack_forget()
-            self.view._lookup_type_combobox.configure(state="normal")
-            self.view.find_button.configure(state="normal")
+
+            def update_ui():
+                self.view.find_progress.pack_forget()
+                self.view._lookup_type_combobox.configure(state="normal")
+                self.view.find_button.configure(state="normal")
+
+            self.view.parent.add_callback(update_ui)
 
     def _get_search_params(self, cmdr: CMDRStatus, search_type: str):
         assert cmdr.location.root.location_type != CMDRLocationKind.Unknown
