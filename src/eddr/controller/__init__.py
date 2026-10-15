@@ -165,8 +165,6 @@ class Controller:
                 )
         print(f"Journals processed {datetime.now(UTC)}")
         self.view.add_callback(self.update_active_journals)
-        self.warm_up = False
-        self._observer.start()
 
     def _schedule_journal_update(self, journal_path: str):
         self.view.add_callback(self._schedule_debounced_journal_update, journal_path)
