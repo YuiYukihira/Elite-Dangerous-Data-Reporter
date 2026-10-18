@@ -265,6 +265,7 @@ class FindView:
                 "Tech Broker (Human)",
                 "DSSA Carrier",
                 "Exploration Carrier",
+                "Interstellar Factor",
             ],
         )
         self._lookup_type_combobox.pack(side="left", fill="x")

@@ -222,4 +222,8 @@ class FindController:
                     }
                 ],
             }
+        elif search_type == "Interstellar Factor":
+            search_params["filters"] = {
+                "services": [{"name": {"value": ["Interstellar Factors Contact"]}}]
+            }
         return search_params
