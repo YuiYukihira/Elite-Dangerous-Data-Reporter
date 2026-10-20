@@ -88,14 +88,15 @@ class Controller:
 
         self.warm_up = True
 
-        self._check_version()
+        threading.Thread(target=self._check_version, daemon=True).start()
 
         threading.Thread(target=self._warm_up_journals, daemon=True).start()
 
     def _check_version(self):
         try:
             res = requests.get(
-                "https://api.github.com/repos/YuiYukihira/Elite-Dangerous-Data-Reporter/releases/latest"
+                "https://api.github.com/repos/YuiYukihira/Elite-Dangerous-Data-Reporter/releases/latest",
+                timeout=5,
             )
             res.raise_for_status()
         except requests.RequestException as e:
@@ -115,7 +116,8 @@ class Controller:
                     "https://github.com/YuiYukihira/Elite-Dangerous-Data-Reporter/releases/latest"
                 )
 
-            ConfirmationPopup(
+            self.view.add_callback(
+                ConfirmationPopup,
                 self.view.root,
                 "Update Available",
                 f"New version available: {latest_version}\nGo to release page?",
