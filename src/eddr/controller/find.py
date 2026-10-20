@@ -52,7 +52,7 @@ class FindController:
 
     def _do_find(self):
         cmdr = self.parent.model.selected_cmdr
-        if not cmdr:
+        if not cmdr or cmdr.location.root.location_type == CMDRLocationKind.Unknown:
             return
 
         self.view._lookup_type_combobox.configure(state="disabled")
