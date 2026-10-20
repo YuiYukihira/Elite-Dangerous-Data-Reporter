@@ -129,10 +129,8 @@ class Controller:
             print(f"Exception while warming up journals:\n{traceback.format_exc()}")
         finally:
             self.warm_up = False
-            try:
-                self.update_active_journals()
-            finally:
-                self._observer.start()
+            self.view.add_callback(self.update_active_journals)
+            self._observer.start()
 
     def _read_all_journals(self):
         handler = JournalEventHandler(self)
@@ -164,7 +162,6 @@ class Controller:
                     f"Exception while reading {journal_file}:\n{traceback.format_exc()}"
                 )
         print(f"Journals processed {datetime.now(UTC)}")
-        self.view.add_callback(self.update_active_journals)
 
     def _schedule_journal_update(self, journal_path: str):
         self.view.add_callback(self._schedule_debounced_journal_update, journal_path)
