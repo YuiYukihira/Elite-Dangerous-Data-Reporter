@@ -24,20 +24,20 @@ class FindController:
         self.view.system_contextmenu.add_command(
             label="Copy",
             command=lambda: self.parent.view.copy_to_clipboard(
-                self.parent.view.overview.system_name.get()
+                self.model.results_system.get()
             ),
         )
         self.view.system_contextmenu.add_command(
             label="Open (Inara)",
             command=lambda: self.parent.open_system_on_inara(
-                self.parent.view.overview.system_name.get()
+                self.model.results_system.get()
             ),
         )
 
         self.view.location_contextmenu.add_command(
             label="Copy",
             command=lambda: self.parent.view.copy_to_clipboard(
-                self.parent.view.overview.location_name.get()
+                self.model.results_location.get()
             ),
         )
         self.view.location_contextmenu.add_command(
