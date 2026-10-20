@@ -246,6 +246,9 @@ class Controller:
             elif msg.entry.root.event == JournalEntryKind.FSDJump:
                 self._process_fsd_or_carrier_jump(cmdr, msg.fid, msg.entry.root)
                 cmdr_updated = True
+            elif msg.entry.root.event == JournalEntryKind.CarrierJump:
+                self._process_location(cmdr, msg.fid, msg.entry.root)
+                cmdr_updated = True
             elif (
                 msg.entry.root.event == JournalEntryKind.SuperCruiseEntry
                 or msg.entry.root.event == JournalEntryKind.Undocked
@@ -308,7 +311,9 @@ class Controller:
             )
         )
 
-    def _process_location(self, cmdr: CMDRStatus, fid: str, msg: Location):
+    def _process_location(
+        self, cmdr: CMDRStatus, fid: str, msg: Location | CarrierJump
+    ):
         if msg.Docked and msg.StationType == "FleetCarrier":
             cmdr.location = CMDRLocation(
                 root=CMDRLocationCarrier(
