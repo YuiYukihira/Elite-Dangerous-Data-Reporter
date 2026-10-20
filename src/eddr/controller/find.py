@@ -71,7 +71,7 @@ class FindController:
         search_string = json.dumps(search_params)
 
         if self.model.last_search_params == search_string:
-            self.view._lookup_type_combobox.configure(state="normal")
+            self.view._lookup_type_combobox.configure(state="readonly")
             self.view.find_button.configure(state="normal")
             self.view.find_progress.pack_forget()
             return
@@ -145,7 +145,7 @@ class FindController:
                     padx=5,
                     pady=5,
                 )
-                self.view._lookup_type_combobox.configure(state="normal")
+                self.view._lookup_type_combobox.configure(state="readonly")
                 self.view.find_button.configure(state="normal")
 
             self.model.last_search_params = search_string
@@ -163,7 +163,7 @@ class FindController:
 
             def update_ui():
                 self.view.find_progress.pack_forget()
-                self.view._lookup_type_combobox.configure(state="normal")
+                self.view._lookup_type_combobox.configure(state="readonly")
                 self.view.find_button.configure(state="normal")
 
             self.view.parent.add_callback(update_ui)
