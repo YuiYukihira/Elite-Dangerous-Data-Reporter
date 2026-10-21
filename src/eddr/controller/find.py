@@ -24,20 +24,20 @@ class FindController:
         self.view.system_contextmenu.add_command(
             label="Copy",
             command=lambda: self.parent.view.copy_to_clipboard(
-                self.parent.view.overview.system_name.get()
+                self.model.results_system.get()
             ),
         )
         self.view.system_contextmenu.add_command(
             label="Open (Inara)",
             command=lambda: self.parent.open_system_on_inara(
-                self.parent.view.overview.system_name.get()
+                self.model.results_system.get()
             ),
         )
 
         self.view.location_contextmenu.add_command(
             label="Copy",
             command=lambda: self.parent.view.copy_to_clipboard(
-                self.parent.view.overview.location_name.get()
+                self.model.results_location.get()
             ),
         )
         self.view.location_contextmenu.add_command(
@@ -52,7 +52,7 @@ class FindController:
 
     def _do_find(self):
         cmdr = self.parent.model.selected_cmdr
-        if not cmdr:
+        if not cmdr or cmdr.location.root.location_type == CMDRLocationKind.Unknown:
             return
 
         self.view._lookup_type_combobox.configure(state="disabled")
@@ -71,7 +71,7 @@ class FindController:
         search_string = json.dumps(search_params)
 
         if self.model.last_search_params == search_string:
-            self.view._lookup_type_combobox.configure(state="normal")
+            self.view._lookup_type_combobox.configure(state="readonly")
             self.view.find_button.configure(state="normal")
             self.view.find_progress.pack_forget()
             return
@@ -145,7 +145,7 @@ class FindController:
                     padx=5,
                     pady=5,
                 )
-                self.view._lookup_type_combobox.configure(state="normal")
+                self.view._lookup_type_combobox.configure(state="readonly")
                 self.view.find_button.configure(state="normal")
 
             self.model.last_search_params = search_string
@@ -163,7 +163,7 @@ class FindController:
 
             def update_ui():
                 self.view.find_progress.pack_forget()
-                self.view._lookup_type_combobox.configure(state="normal")
+                self.view._lookup_type_combobox.configure(state="readonly")
                 self.view.find_button.configure(state="normal")
 
             self.view.parent.add_callback(update_ui)

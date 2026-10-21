@@ -88,14 +88,15 @@ class Controller:
 
         self.warm_up = True
 
-        self._check_version()
+        threading.Thread(target=self._check_version, daemon=True).start()
 
         threading.Thread(target=self._warm_up_journals, daemon=True).start()
 
     def _check_version(self):
         try:
             res = requests.get(
-                "https://api.github.com/repos/YuiYukihira/Elite-Dangerous-Data-Reporter/releases/latest"
+                "https://api.github.com/repos/YuiYukihira/Elite-Dangerous-Data-Reporter/releases/latest",
+                timeout=5,
             )
             res.raise_for_status()
         except requests.RequestException as e:
@@ -115,7 +116,8 @@ class Controller:
                     "https://github.com/YuiYukihira/Elite-Dangerous-Data-Reporter/releases/latest"
                 )
 
-            ConfirmationPopup(
+            self.view.add_callback(
+                ConfirmationPopup,
                 self.view.root,
                 "Update Available",
                 f"New version available: {latest_version}\nGo to release page?",
@@ -129,10 +131,8 @@ class Controller:
             print(f"Exception while warming up journals:\n{traceback.format_exc()}")
         finally:
             self.warm_up = False
-            try:
-                self.update_active_journals()
-            finally:
-                self._observer.start()
+            self.view.add_callback(self.update_active_journals)
+            self._observer.start()
 
     def _read_all_journals(self):
         handler = JournalEventHandler(self)
@@ -164,7 +164,6 @@ class Controller:
                     f"Exception while reading {journal_file}:\n{traceback.format_exc()}"
                 )
         print(f"Journals processed {datetime.now(UTC)}")
-        self.view.add_callback(self.update_active_journals)
 
     def _schedule_journal_update(self, journal_path: str):
         self.view.add_callback(self._schedule_debounced_journal_update, journal_path)
@@ -247,6 +246,9 @@ class Controller:
             elif msg.entry.root.event == JournalEntryKind.FSDJump:
                 self._process_fsd_or_carrier_jump(cmdr, msg.fid, msg.entry.root)
                 cmdr_updated = True
+            elif msg.entry.root.event == JournalEntryKind.CarrierJump:
+                self._process_location(cmdr, msg.fid, msg.entry.root)
+                cmdr_updated = True
             elif (
                 msg.entry.root.event == JournalEntryKind.SuperCruiseEntry
                 or msg.entry.root.event == JournalEntryKind.Undocked
@@ -309,7 +311,9 @@ class Controller:
             )
         )
 
-    def _process_location(self, cmdr: CMDRStatus, fid: str, msg: Location):
+    def _process_location(
+        self, cmdr: CMDRStatus, fid: str, msg: Location | CarrierJump
+    ):
         if msg.Docked and msg.StationType == "FleetCarrier":
             cmdr.location = CMDRLocation(
                 root=CMDRLocationCarrier(

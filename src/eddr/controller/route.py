@@ -316,8 +316,10 @@ class RouteController:
             "page": 0,
         }
 
+        self.suggestion_counter += 1
+        counter = self.suggestion_counter
+
         def fetch():
-            counter = self.suggestion_counter
             res = requests.post(
                 "https://www.spansh.co.uk/api/systems/search/save",
                 timeout=30,
@@ -340,10 +342,9 @@ class RouteController:
             res = res.json()["results"]
 
             def update_ui():
-                if counter < self.suggestion_counter:
+                if counter != self.suggestion_counter:
                     return
 
-                self.suggestion_counter += 1
                 self.model.destination_suggestions = {
                     entry["name"].lower(): entry["id64"] for entry in res
                 }

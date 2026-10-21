@@ -267,6 +267,7 @@ class FindView:
                 "Exploration Carrier",
                 "Interstellar Factor",
             ],
+            state="readonly",
         )
         self._lookup_type_combobox.pack(side="left", fill="x")
 

@@ -101,7 +101,7 @@ class OverviewController:
             search_string = cmdr.location.root.callsign
         else:
             search_string = (
-                f"{cmdr.location.root.system_name} [{cmdr.location.root.name}]"
+                f"{cmdr.location.root.name} [{cmdr.location.root.system_name}]"
             )
         search_string = urllib.parse.urlencode({"search": search_string})
 
